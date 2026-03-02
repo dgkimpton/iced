@@ -97,11 +97,11 @@ where
         fn view<'a>(
             &self,
             state: &'a Self::State,
-            _window: window::Id,
+            window: window::Id,
         ) -> Element<'a, Self::Message, Self::Theme, Self::Renderer> {
             debug::hot(|| {
                 self.view
-                    .view(state)
+                    .view(state, window)
                     .map(|message| (message, Instant::now()))
             })
         }

@@ -131,9 +131,9 @@ where
         fn view<'a>(
             &self,
             state: &'a Self::State,
-            _window: window::Id,
+            window: window::Id,
         ) -> Element<'a, Self::Message, Self::Theme, Self::Renderer> {
-            self.view.view(state)
+            self.view.view(state, window)
         }
 
         fn settings(&self) -> Settings {
@@ -588,7 +588,7 @@ where
 /// returns any `Into<Element<'_, Message>>`.
 pub trait ViewFn<'a, State, Message, Theme, Renderer> {
     /// Produces the widget of the [`Application`].
-    fn view(&self, state: &'a State) -> Element<'a, Message, Theme, Renderer>;
+    fn view(&self, state: &'a State, window_id:window::Id) -> Element<'a, Message, Theme, Renderer>;
 }
 
 impl<'a, T, State, Message, Theme, Renderer, Widget> ViewFn<'a, State, Message, Theme, Renderer>
@@ -598,8 +598,60 @@ where
     State: 'static,
     Widget: Into<Element<'a, Message, Theme, Renderer>>,
 {
-    fn view(&self, state: &'a State) -> Element<'a, Message, Theme, Renderer> {
+    /// Wraps a member function `State::view(state:&'a State)` that implements the view logic.
+    /// Used for single window applications.
+    fn view(&self, state: &'a State, _window:window::Id) -> Element<'a, Message, Theme, Renderer> {
         self(state).into()
+    }
+}
+
+/// Tags a ViewFn callback so that Iced provides the window::Id necessary to keep track of window-specific
+/// view layouts in multi-window applications.
+///
+/// Note: Handling of window lifetimes is up to the application, this method only provides the necessary
+/// machinary to make it possible.
+/// For opening new windows see [`iced::window::open()`]
+///
+/// example
+/// ```no_run,standalone_crate
+///
+/// fn main() -> iced::Result {
+///   iced::run(
+///     State::update,
+///     iced::application:: MultiWindowAware(State::view)
+///   )
+/// }
+///
+/// #[derive(Default)]
+/// struct State{}
+///
+/// #[derive(Debug, Clone)]
+/// enum Message {
+/// }
+///
+/// impl State{
+///     fn update(&mut self, _message: Message) -> iced::Task<Message>  {
+///         iced::Task::none()
+///     }
+///
+///     fn view(&self, _window:iced::window::Id) -> iced::Element<'_, Message> {
+///         "multi-window view".into()
+///     }
+/// }
+/// ```
+pub struct MultiWindowAware<T>(pub T);
+
+impl<'a, T, State, Message, Theme, Renderer, Widget> ViewFn<'a, State, Message, Theme, Renderer>
+    for MultiWindowAware<T>
+where
+    T: Fn(&'a State, window::Id) -> Widget,
+    State: 'static,
+    Widget: Into<Element<'a, Message, Theme, Renderer>>,
+{
+    /// Wraps a member function `State::view(state:&'a State, window:window::Id)` that implements the view logic.
+    /// Used for multi-window applications.
+    fn view(&self, state: &'a State, window:window::Id) -> Element<'a, Message, Theme, Renderer> {
+        (self.0)(state, window).into()
     }
 }
 
