@@ -75,8 +75,8 @@ where
             Some(window::Settings::default())
         }
 
-        fn boot(&self) -> (State, Task<Self::Message>) {
-            let (state, task) = self.boot.boot();
+        fn boot(&self, main_window: Option<window::Id>) -> (State, Task<Self::Message>) {
+            let (state, task) = self.boot.boot(main_window);
 
             (state, task.map(|message| (message, Instant::now())))
         }

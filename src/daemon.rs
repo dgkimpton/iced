@@ -74,8 +74,8 @@ where
             None
         }
 
-        fn boot(&self) -> (Self::State, Task<Self::Message>) {
-            self.boot.boot()
+        fn boot(&self, main_window: Option<window::Id>) -> (Self::State, Task<Self::Message>) {
+            self.boot.boot(main_window)
         }
 
         fn update(&self, state: &mut Self::State, message: Self::Message) -> Task<Self::Message> {
@@ -285,8 +285,8 @@ impl<P: Program> Program for Daemon<P> {
         None
     }
 
-    fn boot(&self) -> (Self::State, Task<Self::Message>) {
-        self.raw.boot()
+    fn boot(&self, main_window: Option<window::Id>) -> (Self::State, Task<Self::Message>) {
+        self.raw.boot(main_window)
     }
 
     fn update(&self, state: &mut Self::State, message: Self::Message) -> Task<Self::Message> {

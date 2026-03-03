@@ -120,8 +120,8 @@ where
             name.split("::").next().unwrap_or("a_cool_application")
         }
 
-        fn boot(&self) -> (State, Task<Message>) {
-            self.boot.boot()
+        fn boot(&self, main_window: Option<window::Id>) -> (State, Task<Message>) {
+            self.boot.boot(main_window)
         }
 
         fn update(&self, state: &mut Self::State, message: Self::Message) -> Task<Self::Message> {
@@ -449,8 +449,8 @@ impl<P: Program> Program for Application<P> {
         Some(self.window.clone())
     }
 
-    fn boot(&self) -> (Self::State, Task<Self::Message>) {
-        self.raw.boot()
+    fn boot(&self, main_window: Option<window::Id>) -> (Self::State, Task<Self::Message>) {
+        self.raw.boot(main_window)
     }
 
     fn update(&self, state: &mut Self::State, message: Self::Message) -> Task<Self::Message> {
@@ -495,12 +495,16 @@ impl<P: Program> Program for Application<P> {
 /// This trait is implemented for both `Fn() -> State` and
 /// `Fn() -> (State, Task<Message>)`.
 ///
+/// And with the tag type [`MultiWindowAware`] for both
+/// `Fn(Option<window::Id>) -> State` and
+/// `Fn(Option<window::Id>) -> (State, Task<Message>)`
+///
 /// In practice, this means that [`application`] can both take
 /// simple functions like `State::default` and more advanced ones
 /// that return a [`Task`].
 pub trait BootFn<State, Message> {
     /// Initializes the [`Application`] state.
-    fn boot(&self) -> (State, Task<Message>);
+    fn boot(&self, main_window: Option<window::Id>) -> (State, Task<Message>);
 }
 
 impl<T, C, State, Message> BootFn<State, Message> for T
@@ -508,8 +512,19 @@ where
     T: Fn() -> C,
     C: IntoBoot<State, Message>,
 {
-    fn boot(&self) -> (State, Task<Message>) {
+    fn boot(&self, _main_window: Option<window::Id>) -> (State, Task<Message>) {
         self().into_boot()
+    }
+}
+
+impl<T, C, State, Message> BootFn<State, Message>
+    for MultiWindowAware<T>
+where
+    T: Fn(Option<window::Id>) -> C,
+    C: IntoBoot<State, Message>,
+{
+    fn boot(&self, main_window: Option<window::Id>) -> (State, Task<Message>) {
+        (self.0)(main_window).into_boot()
     }
 }
 
@@ -598,18 +613,21 @@ where
     State: 'static,
     Widget: Into<Element<'a, Message, Theme, Renderer>>,
 {
-    /// Wraps a member function `State::view(state:&'a State)` that implements the view logic.
-    /// Used for single window applications.
+    /// Wraps a member function `State::view(state:&'a State)` that implements
+    /// the view logic. Used for single window applications.
     fn view(&self, state: &'a State, _window:window::Id) -> Element<'a, Message, Theme, Renderer> {
         self(state).into()
     }
 }
 
-/// Tags a ViewFn callback so that Iced provides the window::Id necessary to keep track of window-specific
-/// view layouts in multi-window applications.
+/// Tags a ViewFn callback so that Iced provides the window::Id necessary to
+/// keep track of window-specific view layouts in multi-window applications.
 ///
-/// Note: Handling of window lifetimes is up to the application, this method only provides the necessary
-/// machinary to make it possible.
+/// Additionally, when wrapped around the boot method provides the main window
+/// id for an application (not applicable for daemons).
+///
+/// Note: Handling of window lifetimes is up to the application, this tag only
+/// provides the necessary machinary to make it possible.
 /// For opening new windows see [`iced::window::open()`]
 ///
 /// example
@@ -617,19 +635,31 @@ where
 ///
 /// fn main() -> iced::Result {
 ///   iced::run(
-///     State::update,
-///     iced::application:: MultiWindowAware(State::view)
+///     TestApp::update,
+///     iced::application:: MultiWindowAware(TestApp::view)
 ///   )
 /// }
 ///
+/// fn main_with_boot() -> iced::Result {
+///     iced::application(
+///         iced::application::MultiWindowAware(TestApp::boot),
+///         TestApp::update,
+///         iced::application::MultiWindowAware(TestApp::view),
+///     ).run()
+/// }
+///
 /// #[derive(Default)]
-/// struct State{}
+/// struct TestApp{}
 ///
 /// #[derive(Debug, Clone)]
 /// enum Message {
 /// }
 ///
-/// impl State{
+/// impl TestApp{
+///     fn boot(_main_window:Option<iced::window::Id>) -> (Self, iced::Task<Message>) {
+///         (Self{}, iced::Task::none())
+///     }
+///
 ///     fn update(&mut self, _message: Message) -> iced::Task<Message>  {
 ///         iced::Task::none()
 ///     }
@@ -648,8 +678,8 @@ where
     State: 'static,
     Widget: Into<Element<'a, Message, Theme, Renderer>>,
 {
-    /// Wraps a member function `State::view(state:&'a State, window:window::Id)` that implements the view logic.
-    /// Used for multi-window applications.
+    /// Wraps a member function `State::view(state:&'a State, iced:window::Id)`
+    /// that implements the view logic. Used for multi-window applications.
     fn view(&self, state: &'a State, window:window::Id) -> Element<'a, Message, Theme, Renderer> {
         (self.0)(state, window).into()
     }
