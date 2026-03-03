@@ -22,7 +22,7 @@ use std::borrow::Cow;
 ///
 /// [`exit`]: crate::exit
 pub fn daemon<State, Message, Theme, Renderer>(
-    boot: impl application::BootFn<State, Message>,
+    boot: impl BootFn<State, Message>,
     update: impl application::UpdateFn<State, Message>,
     view: impl for<'a> ViewFn<'a, State, Message, Theme, Renderer>,
 ) -> Daemon<impl Program<State = State, Message = Message, Theme = Theme>>
@@ -50,7 +50,7 @@ where
         Message: Send + 'static,
         Theme: theme::Base,
         Renderer: program::Renderer,
-        Boot: application::BootFn<State, Message>,
+        Boot: BootFn<State, Message>,
         Update: application::UpdateFn<State, Message>,
         View: for<'a> self::ViewFn<'a, State, Message, Theme, Renderer>,
     {
@@ -74,8 +74,8 @@ where
             None
         }
 
-        fn boot(&self, main_window: Option<window::Id>) -> (Self::State, Task<Self::Message>) {
-            self.boot.boot(main_window)
+        fn boot(&self, _main_window: Option<window::Id>) -> (Self::State, Task<Self::Message>) {
+            self.boot.boot()
         }
 
         fn update(&self, state: &mut Self::State, message: Self::Message) -> Task<Self::Message> {
@@ -349,6 +349,47 @@ where
 {
     fn title(&self, state: &State, window: window::Id) -> String {
         self(state, window)
+    }
+}
+
+/// The logic to initialize the `State` of some [`Daemon`].
+///
+/// This trait is implemented for both `Fn() -> State` and
+/// `Fn() -> (State, Task<Message>)`.
+///
+/// In practice, this means that [`daemon`] can both take
+/// simple functions like `State::default` and more advanced ones
+/// that return a [`Task`].
+pub trait BootFn<State, Message> {
+    /// Initializes the [`Daemon`] state.
+    fn boot(&self) -> (State, Task<Message>);
+}
+
+impl<T, C, State, Message> BootFn<State, Message> for T
+where
+    T: Fn() -> C,
+    C: IntoBoot<State, Message>,
+{
+    fn boot(&self) -> (State, Task<Message>) {
+        self().into_boot()
+    }
+}
+
+/// The initial state of some [`Daemon`].
+pub trait IntoBoot<State, Message> {
+    /// Turns some type into the initial state of some [`Daemon`].
+    fn into_boot(self) -> (State, Task<Message>);
+}
+
+impl<State, Message> IntoBoot<State, Message> for State {
+    fn into_boot(self) -> (State, Task<Message>) {
+        (self, Task::none())
+    }
+}
+
+impl<State, Message> IntoBoot<State, Message> for (State, Task<Message>) {
+    fn into_boot(self) -> (State, Task<Message>) {
+        self
     }
 }
 
