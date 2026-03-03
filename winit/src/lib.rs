@@ -101,17 +101,17 @@ where
         Runtime::new(executor, proxy.clone())
     };
 
-    let (program, task) = runtime.enter(|| program::Instance::new(program));
     let is_daemon = window_settings.is_none();
 
-    let task = if let Some(window_settings) = window_settings {
-        let mut task = Some(task);
+    let (program, task) = if let Some((window_id, open_task)) =
+        window_settings.map(runtime::window::open)
+    {
+        let (program, mut boot_task) =
+            runtime.enter(|| program::Instance::new(program, Some(window_id)));
 
-        let (_id, open) = runtime::window::open(window_settings);
-
-        open.then(move |_| task.take().unwrap_or_else(Task::none))
+        (program, open_task.then(move |_| std::mem::take(&mut boot_task)))
     } else {
-        task
+        runtime.enter(|| program::Instance::new(program, None))
     };
 
     if let Some(stream) = runtime::task::into_stream(task) {

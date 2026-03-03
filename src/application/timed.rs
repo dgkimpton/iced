@@ -75,8 +75,8 @@ where
             Some(window::Settings::default())
         }
 
-        fn boot(&self) -> (State, Task<Self::Message>) {
-            let (state, task) = self.boot.boot();
+        fn boot(&self, main_window: Option<window::Id>) -> (State, Task<Self::Message>) {
+            let (state, task) = self.boot.boot(main_window);
 
             (state, task.map(|message| (message, Instant::now())))
         }
@@ -97,11 +97,11 @@ where
         fn view<'a>(
             &self,
             state: &'a Self::State,
-            _window: window::Id,
+            window: window::Id,
         ) -> Element<'a, Self::Message, Self::Theme, Self::Renderer> {
             debug::hot(|| {
                 self.view
-                    .view(state)
+                    .view(state, window)
                     .map(|message| (message, Instant::now()))
             })
         }

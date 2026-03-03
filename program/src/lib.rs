@@ -47,7 +47,14 @@ pub trait Program: Sized {
 
     fn window(&self) -> Option<window::Settings>;
 
-    fn boot(&self) -> (Self::State, Task<Self::Message>);
+    /// Initialise the state of the application or daemon before
+    /// first [`view`] or [`update`].
+    ///
+    /// For **applications** the main_window will always be `Some`,
+    ///
+    /// For **daemons** it will always be `None` (daemon windows are created
+    /// later with [`window::open`] )
+    fn boot(&self, main_window: Option<window::Id>) -> (Self::State, Task<Self::Message>);
 
     fn update(&self, state: &mut Self::State, message: Self::Message) -> Task<Self::Message>;
 
@@ -144,8 +151,8 @@ pub fn with_title<P: Program>(
             self.program.window()
         }
 
-        fn boot(&self) -> (Self::State, Task<Self::Message>) {
-            self.program.boot()
+        fn boot(&self, main_window: Option<window::Id>) -> (Self::State, Task<Self::Message>) {
+            self.program.boot(main_window)
         }
 
         fn update(&self, state: &mut Self::State, message: Self::Message) -> Task<Self::Message> {
@@ -216,8 +223,8 @@ pub fn with_subscription<P: Program>(
             self.program.window()
         }
 
-        fn boot(&self) -> (Self::State, Task<Self::Message>) {
-            self.program.boot()
+        fn boot(&self, main_window: Option<window::Id>) -> (Self::State, Task<Self::Message>) {
+            self.program.boot(main_window)
         }
 
         fn update(&self, state: &mut Self::State, message: Self::Message) -> Task<Self::Message> {
@@ -291,8 +298,8 @@ pub fn with_theme<P: Program>(
             self.program.window()
         }
 
-        fn boot(&self) -> (Self::State, Task<Self::Message>) {
-            self.program.boot()
+        fn boot(&self, main_window: Option<window::Id>) -> (Self::State, Task<Self::Message>) {
+            self.program.boot(main_window)
         }
 
         fn title(&self, state: &Self::State, window: window::Id) -> String {
@@ -363,8 +370,8 @@ pub fn with_style<P: Program>(
             self.program.window()
         }
 
-        fn boot(&self) -> (Self::State, Task<Self::Message>) {
-            self.program.boot()
+        fn boot(&self, main_window: Option<window::Id>) -> (Self::State, Task<Self::Message>) {
+            self.program.boot(main_window)
         }
 
         fn title(&self, state: &Self::State, window: window::Id) -> String {
@@ -435,8 +442,8 @@ pub fn with_scale_factor<P: Program>(
             self.program.window()
         }
 
-        fn boot(&self) -> (Self::State, Task<Self::Message>) {
-            self.program.boot()
+        fn boot(&self, main_window: Option<window::Id>) -> (Self::State, Task<Self::Message>) {
+            self.program.boot(main_window)
         }
 
         fn update(&self, state: &mut Self::State, message: Self::Message) -> Task<Self::Message> {
@@ -511,8 +518,8 @@ pub fn with_executor<P: Program, E: Executor>(
             self.program.window()
         }
 
-        fn boot(&self) -> (Self::State, Task<Self::Message>) {
-            self.program.boot()
+        fn boot(&self, main_window: Option<window::Id>) -> (Self::State, Task<Self::Message>) {
+            self.program.boot(main_window)
         }
 
         fn update(&self, state: &mut Self::State, message: Self::Message) -> Task<Self::Message> {
@@ -566,8 +573,8 @@ pub struct Instance<P: Program> {
 
 impl<P: Program> Instance<P> {
     /// Creates a new [`Instance`] of the given [`Program`].
-    pub fn new(program: P) -> (Self, Task<P::Message>) {
-        let (state, task) = program.boot();
+    pub fn new(program: P, main_window: Option<window::Id>) -> (Self, Task<P::Message>) {
+        let (state, task) = program.boot(main_window);
 
         (Self { program, state }, task)
     }
